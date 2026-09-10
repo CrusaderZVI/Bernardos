@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Barnardo's Vinyl Installation Route Map</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+ integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+
+<style>
+:root {
+  --ink:#0f172a;
+  --panel:rgba(255,255,255,.96);
+  --border:#d7dde5;
+  --shadow:0 8px 26px rgba(15,23,42,.18);
+  --S:#2f855a;
+  --M:#d69e2e;
+  --L:#2b6cb0;
+  --XL:#c53030;
+}
+* { box-sizing:border-box; }
+html,body { margin:0; width:100%; height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; background:#dce6eb; }
+body { overflow:hidden; }
+button,a { -webkit-tap-highlight-color:transparent; }
+#map { position:absolute; inset:0; z-index:1; }
+
+.topbar {
+  position:absolute; z-index:1000;
+  top:calc(10px + env(safe-area-inset-top)); left:10px; right:10px;
+  display:flex; gap:8px; align-items:flex-start;
+}
+.brand {
+  flex:1; min-width:0;
+  background:var(--panel); border:1px solid rgba(255,255,255,.85);
+  border-radius:14px; box-shadow:var(--shadow);
+  padding:10px 12px;
+}
+.brand h1 { margin:0; font-size:16px; line-height:1.15; color:var(--ink); }
+.brand p { margin:3px 0 0; font-size:11px; color:#64748b; line-height:1.25; }
+.icon-btn {
+  flex:0 0 auto; width:48px; height:48px;
+  border:1px solid rgba(255,255,255,.85); border-radius:14px;
+  background:var(--panel); box-shadow:var(--shadow);
+  font-size:21px; font-weight:800; color:var(--ink);
+}
+
+.regionbar {
+  position:absolute; z-index:1000;
+  top:calc(80px + env(safe-area-inset-top)); left:10px; right:10px;
+  display:flex; gap:7px; overflow-x:auto; white-space:nowrap;
+  padding:4px; scrollbar-width:none;
+}
+.regionbar::-webkit-scrollbar { display:none; }
+.regionbar button {
+  min-height:40px; padding:0 13px;
+  border:1px solid #cbd5e1; border-radius:999px;
+  background:rgba(255,255,255,.95); box-shadow:0 3px 10px rgba(15,23,42,.12);
+  color:#334155; font-size:13px; font-weight:700;
+}
+.regionbar button.active { background:#0f172a; color:#fff; border-color:#0f172a; }
+
+.legend {
+  position:absolute; z-index:1000;
+  left:10px; bottom:calc(12px + env(safe-area-inset-bottom));
+  background:var(--panel); border:1px solid #e2e8f0;
+  border-radius:12px; box-shadow:var(--shadow);
+  padding:8px 10px; font-size:11px; color:#334155;
+}
+.legend-row { display:flex; flex-wrap:wrap; gap:9px; }
+.legend span { display:inline-flex; align-items:center; gap:4px; }
+.dot { width:10px; height:10px; border-radius:50%; border:1px solid #334155; }
+
+.leaflet-control-zoom { margin-top:132px !important; }
+.leaflet-control-zoom a { width:44px !important; height:44px !important; line-height:44px !important; font-size:22px !important; }
+.leaflet-popup-content-wrapper { border-radius:13px; }
+.leaflet-popup-content { margin:12px 14px; min-width:210px; font-size:13px; line-height:1.45; }
+.popup-title { font-size:15px; font-weight:800; margin-bottom:4px; }
+.popup-size { display:inline-block; padding:2px 7px; border-radius:999px; color:#fff; font-weight:800; font-size:11px; }
+.maps-link {
+  display:block; margin-top:9px; padding:8px 10px; text-align:center;
+  border-radius:8px; background:#0f172a; color:#fff !important;
+  text-decoration:none; font-weight:700;
+}
+
+.marker {
+  width:30px; height:30px; border-radius:50% 50% 50% 0;
+  transform:rotate(-45deg);
+  border:2px solid #fff;
+  box-shadow:0 2px 6px rgba(0,0,0,.35);
+  position:relative;
+}
+.marker > span {
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  transform:rotate(45deg); color:#fff; font-weight:900; font-size:11px;
+}
+
+.sheet-backdrop {
+  display:none; position:absolute; z-index:1998; inset:0;
+  background:rgba(15,23,42,.38);
+}
+.sheet {
+  position:absolute; z-index:1999;
+  left:0; right:0; bottom:0;
+  max-height:82%;
+  background:#f8fafc;
+  border-radius:20px 20px 0 0;
+  box-shadow:0 -14px 30px rgba(15,23,42,.22);
+  transform:translateY(105%);
+  transition:transform .22s ease;
+  overflow:hidden;
+}
+.sheet.open { transform:translateY(0); }
+.sheet-backdrop.open { display:block; }
+.sheet-head {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:13px 14px; background:#fff; border-bottom:1px solid #e2e8f0;
+}
+.sheet-head h2 { margin:0; font-size:18px; }
+.sheet-close {
+  width:42px; height:42px; border-radius:10px; border:1px solid #cbd5e1; background:#fff; font-size:20px;
+}
+.sheet-content {
+  padding:12px 14px calc(22px + env(safe-area-inset-bottom));
+  max-height:calc(82vh - 69px); overflow:auto;
+}
+.card {
+  background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px; margin-bottom:10px;
+}
+.card h3 { margin:0 0 7px; font-size:15px; color:#0f172a; }
+.key-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.key-item { display:flex; align-items:center; gap:7px; font-size:13px; color:#334155; }
+.route { padding:9px 0; border-top:1px solid #eef2f7; font-size:13px; line-height:1.45; color:#334155; }
+.route:first-child { border-top:0; padding-top:0; }
+.route b { color:#0f172a; display:block; margin-bottom:2px; }
+
+.switchrow { display:flex; gap:8px; margin-bottom:10px; }
+.switchrow button {
+  flex:1; min-height:44px; border-radius:10px; border:1px solid #cbd5e1;
+  background:#fff; font-weight:700; color:#334155;
+}
+.switchrow button.active { background:#0f172a; color:#fff; border-color:#0f172a; }
+
+@media (min-width:800px) {
+  .topbar { right:auto; width:470px; }
+  .regionbar { top:82px; right:auto; width:720px; }
+  .sheet { left:auto; width:430px; height:100%; max-height:none; border-radius:0; }
+  .sheet-content { max-height:calc(100vh - 69px); }
+  .sheet-backdrop { display:none !important; }
+}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="topbar">
+  <div class="brand">
+    <h1>Barnardo's Vinyl Installation Route</h1>
+    <p>Tap a pin for store details. Pins are numbered by regional stop order.</p>
+  </div>
+  <button class="icon-btn" id="infoBtn" aria-label="Open route information">☰</button>
+</div>
+
+<div class="regionbar" id="regionbar">
+  <button class="active" data-region="All">All</button>
+  <button data-region="Scotland">Scotland</button>
+  <button data-region="North">North</button>
+  <button data-region="Midlands & Wales">Midlands & Wales</button>
+  <button data-region="South">South</button>
+</div>
+
+<div class="legend">
+  <div class="legend-row">
+    <span><i class="dot" style="background:var(--S)"></i>S 600mm</span>
+    <span><i class="dot" style="background:var(--M)"></i>M 1m</span>
+    <span><i class="dot" style="background:var(--L)"></i>L 1.5m</span>
+    <span><i class="dot" style="background:var(--XL)"></i>XL 2m</span>
+  </div>
+</div>
+
+<div class="sheet-backdrop" id="backdrop"></div>
+<aside class="sheet" id="sheet" aria-label="Route information">
+  <div class="sheet-head">
+    <h2>Route information</h2>
+    <button class="sheet-close" id="closeSheet" aria-label="Close">×</button>
+  </div>
+  <div class="sheet-content">
+
+    <div class="switchrow">
+      <button class="active" id="allStoresBtn">All stores</button>
+      <button id="priorityBtn">L + XL only</button>
+    </div>
+
+    <div class="card">
+      <h3>Store size key</h3>
+      <div class="key-grid">
+        <div class="key-item"><i class="dot" style="background:var(--S)"></i>Small — 600mm</div>
+        <div class="key-item"><i class="dot" style="background:var(--M)"></i>Medium — 1m</div>
+        <div class="key-item"><i class="dot" style="background:var(--L)"></i>Large — 1.5m</div>
+        <div class="key-item"><i class="dot" style="background:var(--XL)"></i>XL — 2m</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Route order</h3>
+      <div class="route"><b>Scotland</b>1 Kilmarnock → 2 Kirkcaldy → 3 Aberdeen</div>
+      <div class="route"><b>North</b>1 Thornton-Cleveleys → 2 Preston → 3 Liverpool → 4 Swinton → 5 Cheadle → 6 Glossop → 7 Sheffield → 8 Goole → 9 Wallsend</div>
+      <div class="route"><b>Midlands & Wales</b>1 Rhyl → 2 Wrexham → 3 Madeley → 4 West Bromwich → 5 Shirley → 6 Coventry → 7 Blackwood → 8 Aberdare → 9 Gorseinon</div>
+      <div class="route"><b>South</b>1 Camborne → 2 Poole → 3 Swindon → 4 Slough → 5 Harold Hill → 6 Colchester</div>
+    </div>
+
+    <div class="card">
+      <h3>Important</h3>
+      <div style="font-size:12px;line-height:1.45;color:#64748b">
+        Large and XL stores are the priority. Medium stores can be completed en route where practical.
+        Current pins are town-level positions from the supplied list rather than confirmed branch postcodes.
+      </div>
+    </div>
+  </div>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+ integrity="sha256-20nQCchB9coqIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+const stores = [{"name": "Kilmarnock", "lat": 55.6116, "lon": -4.4952, "size": "S", "display": "600mm", "qty": 2, "region": "Scotland", "order": 1}, {"name": "Kirkcaldy", "lat": 56.1107, "lon": -3.1599, "size": "M", "display": "1m", "qty": 1, "region": "Scotland", "order": 2}, {"name": "Aberdeen", "lat": 57.1497, "lon": -2.0943, "size": "L", "display": "1.5m", "qty": 1, "region": "Scotland", "order": 3}, {"name": "Thornton-Cleveleys", "lat": 53.8739, "lon": -3.022, "size": "L", "display": "1.5m", "qty": 1, "region": "North", "order": 1}, {"name": "Preston", "lat": 53.7632, "lon": -2.7031, "size": "S", "display": "600mm", "qty": 2, "region": "North", "order": 2}, {"name": "Liverpool", "lat": 53.4084, "lon": -2.9916, "size": "L", "display": "1.5m", "qty": 2, "region": "North", "order": 3}, {"name": "Swinton", "lat": 53.5149, "lon": -2.3378, "size": "XL", "display": "2m", "qty": 1, "region": "North", "order": 4}, {"name": "Cheadle", "lat": 53.3946, "lon": -2.2125, "size": "L", "display": "1.5m", "qty": 1, "region": "North", "order": 5}, {"name": "Glossop", "lat": 53.4432, "lon": -1.949, "size": "L", "display": "1.5m", "qty": 1, "region": "North", "order": 6}, {"name": "Sheffield", "lat": 53.3811, "lon": -1.4701, "size": "M", "display": "1m", "qty": 1, "region": "North", "order": 7}, {"name": "Goole", "lat": 53.7039, "lon": -0.8745, "size": "L", "display": "1.5m", "qty": 1, "region": "North", "order": 8}, {"name": "Wallsend", "lat": 54.991, "lon": -1.5335, "size": "M", "display": "1m", "qty": 1, "region": "North", "order": 9}, {"name": "Rhyl", "lat": 53.3198, "lon": -3.4923, "size": "L", "display": "1.5m", "qty": 1, "region": "Midlands & Wales", "order": 1}, {"name": "Wrexham", "lat": 53.0461, "lon": -2.9925, "size": "L", "display": "1.5m", "qty": 2, "region": "Midlands & Wales", "order": 2}, {"name": "Madeley", "lat": 52.6375, "lon": -2.4494, "size": "M", "display": "1m", "qty": 1, "region": "Midlands & Wales", "order": 3}, {"name": "West Bromwich", "lat": 52.5187, "lon": -1.9945, "size": "L", "display": "1.5m", "qty": 1, "region": "Midlands & Wales", "order": 4}, {"name": "Shirley", "lat": 52.4108, "lon": -1.8276, "size": "M", "display": "1m", "qty": 1, "region": "Midlands & Wales", "order": 5}, {"name": "Coventry", "lat": 52.4068, "lon": -1.5197, "size": "M", "display": "1m", "qty": 1, "region": "Midlands & Wales", "order": 6}, {"name": "Blackwood", "lat": 51.6673, "lon": -3.1952, "size": "M", "display": "1m", "qty": 2, "region": "Midlands & Wales", "order": 7}, {"name": "Aberdare", "lat": 51.7142, "lon": -3.4498, "size": "L", "display": "1.5m", "qty": 1, "region": "Midlands & Wales", "order": 8}, {"name": "Gorseinon", "lat": 51.6696, "lon": -4.0416, "size": "L", "display": "1.5m", "qty": 1, "region": "Midlands & Wales", "order": 9}, {"name": "Camborne", "lat": 50.2137, "lon": -5.2971, "size": "S", "display": "600mm", "qty": 2, "region": "South", "order": 1}, {"name": "Poole", "lat": 50.7151, "lon": -1.9872, "size": "L", "display": "1.5m", "qty": 1, "region": "South", "order": 2}, {"name": "Swindon", "lat": 51.5558, "lon": -1.7797, "size": "L", "display": "1.5m", "qty": 2, "region": "South", "order": 3}, {"name": "Slough", "lat": 51.5099, "lon": -0.5957, "size": "M", "display": "1m", "qty": 1, "region": "South", "order": 4}, {"name": "Harold Hill", "lat": 51.6101, "lon": 0.232, "size": "L", "display": "1.5m", "qty": 1, "region": "South", "order": 5}, {"name": "Colchester", "lat": 51.8892, "lon": 0.9042, "size": "XL", "display": "2m", "qty": 2, "region": "South", "order": 6}];
+const colors = {S:"#2f855a", M:"#d69e2e", L:"#2b6cb0", XL:"#c53030"};
+const routeColors = {
+  "Scotland":"#4c78a8",
+  "North":"#59a14f",
+  "Midlands & Wales":"#b07c2e",
+  "South":"#8f63a8"
+};
+
+const map = L.map("map", {zoomControl:true}).setView([54.4,-2.8],6);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom:19,
+  attribution:'&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+let currentRegion = "All";
+let priorityOnly = false;
+const markerLayer = L.layerGroup().addTo(map);
+const routeLayer = L.layerGroup().addTo(map);
+
+function markerIcon(s) {
+  return L.divIcon({
+    className:"",
+    html:`<div class="marker" style="background:${colors[s.size]}"><span>${s.order}</span></div>`,
+    iconSize:[30,30],
+    iconAnchor:[15,29],
+    popupAnchor:[0,-28]
+  });
+}
+
+function googleMapsUrl(name) {
+  return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("Barnardo's " + name + " UK");
+}
+
+function visibleStores() {
+  return stores.filter(s =>
+    (currentRegion === "All" || s.region === currentRegion) &&
+    (!priorityOnly || s.size === "L" || s.size === "XL")
+  );
+}
+
+function redraw() {
+  markerLayer.clearLayers();
+  routeLayer.clearLayers();
+
+  const visible = visibleStores();
+
+  visible.forEach(s => {
+    const marker = L.marker([s.lat,s.lon], {icon:markerIcon(s)});
+    const color = colors[s.size];
+    marker.bindPopup(`
+      <div class="popup-title">${s.order}. ${s.name}</div>
+      <div>${s.region}</div>
+      <div style="margin-top:5px">
+        <span class="popup-size" style="background:${color}">${s.size} · ${s.display}</span>
+      </div>
+      <div style="margin-top:5px">Quantity: <b>${s.qty}</b></div>
+      <a class="maps-link" href="${googleMapsUrl(s.name)}" target="_blank" rel="noopener">Open in Google Maps</a>
+    `);
+    marker.addTo(markerLayer);
+  });
+
+  const regions = currentRegion === "All"
+    ? ["Scotland","North","Midlands & Wales","South"]
+    : [currentRegion];
+
+  regions.forEach(region => {
+    let routeStores = stores
+      .filter(s => s.region === region && (!priorityOnly || s.size === "L" || s.size === "XL"))
+      .sort((a,b)=>a.order-b.order);
+    if (routeStores.length >= 2) {
+      L.polyline(routeStores.map(s=>[s.lat,s.lon]), {
+        color:routeColors[region],
+        weight:4,
+        opacity:.82,
+        dashArray:"10 7"
+      }).addTo(routeLayer);
+    }
+  });
+
+  if (visible.length) {
+    const bounds = L.latLngBounds(visible.map(s=>[s.lat,s.lon]));
+    map.fitBounds(bounds, {paddingTopLeft:[34,150], paddingBottomRight:[34,65], maxZoom:9});
+  }
+}
+
+document.querySelectorAll("#regionbar button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    currentRegion = btn.dataset.region;
+    document.querySelectorAll("#regionbar button").forEach(b=>b.classList.toggle("active", b===btn));
+    redraw();
+  });
+});
+
+const sheet = document.getElementById("sheet");
+const backdrop = document.getElementById("backdrop");
+function openSheet() {
+  sheet.classList.add("open");
+  backdrop.classList.add("open");
+}
+function closeSheet() {
+  sheet.classList.remove("open");
+  backdrop.classList.remove("open");
+}
+document.getElementById("infoBtn").addEventListener("click",openSheet);
+document.getElementById("closeSheet").addEventListener("click",closeSheet);
+backdrop.addEventListener("click",closeSheet);
+
+document.getElementById("allStoresBtn").addEventListener("click", () => {
+  priorityOnly=false;
+  document.getElementById("allStoresBtn").classList.add("active");
+  document.getElementById("priorityBtn").classList.remove("active");
+  redraw();
+});
+document.getElementById("priorityBtn").addEventListener("click", () => {
+  priorityOnly=true;
+  document.getElementById("priorityBtn").classList.add("active");
+  document.getElementById("allStoresBtn").classList.remove("active");
+  redraw();
+});
+
+window.addEventListener("resize",()=>setTimeout(()=>map.invalidateSize(),80));
+redraw();
+</script>
+</body>
+</html>
